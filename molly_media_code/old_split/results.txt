@@ -1,0 +1,16 @@
+CPH_lifelines-clinical-all 	 54.81 	 50.51
+RSF-clinical-all 	 48.35 	 53.32
+CPH_lifelines-clinical-subset 	 60.21 	 61.68
+RSF-clinical-subset 	 53.03 	 54.14
+CPH_lifelines-radiomics1-all 	 60.21 	 56.96
+RSF-radiomics1-all 	 64.1 	 62.36
+CPH_lifelines-radiomics1-subset 	 60.08 	 62.07
+RSF-radiomics1-subset 	 63.77 	 64.78
+CPH_lifelines-radiomics2-all 	 55.99 	 52.3
+RSF-radiomics2-all 	 49.93 	 44.07
+CPH_lifelines-radiomics2-subset 	 56.65 	 52.82
+RSF-radiomics2-subset 	 52.44 	 47.38
+CPH_lifelines-radiomics3-all 	 60.08 	 56.3
+RSF-radiomics3-all 	 62.45 	 63.61
+CPH_lifelines-combination-all 	 67.06 	 71.11
+RSF-combination-all 	 64.69 	 66.45
