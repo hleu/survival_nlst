@@ -116,6 +116,9 @@ def main():
     kf = KFold(5, shuffle=True, random_state=1234)
 
     for split_idx, (train_index, test_index) in enumerate(kf.split(pos_pids)):
+        
+        if split_idx != 1:
+            continue
 
         train_pids = pos_pids[list(train_index)]
         test_pids = pos_pids[list(test_index)]

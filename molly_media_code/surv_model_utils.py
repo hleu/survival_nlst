@@ -72,7 +72,7 @@ def cox_ph(x_train, x_test, y_train, y_test, df_train, df_test):
     pr = gcv.predict(x_train_ll)   
     cph = CoxPHFitter(l1_ratio=gcv.best_params_['l1_ratio'],
                       penalizer=gcv.best_params_['penalizer'])
-    cph.fit(x_train_lifelines, duration_col='days_1stpos_death', event_col='death_cancer')
+    cph.fit(x_train_lifelines, duration_col='days_1stpos_death', event_col='death_cancer', initial_point=np.random.rand(x_train.shape[1]))
 
     prediction_cph_train = -cph.predict_expectation(x_train_lifelines)
     prediction_cph_test = -cph.predict_expectation(x_test_lifelines)

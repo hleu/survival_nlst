@@ -106,7 +106,7 @@ def parse_clinical(pids, prsndf):
     # fill na, get x y
     df_clin_prep = get_clinical_arr(survdf)
     data_x, data_y = skds.get_x_y(df_clin_prep, attr_labels=['death_cancer', 'days_1stpos_death'], pos_label=1)
-
+    
     # onehotencoder sksurv
     categories = ['educat', 'ethnic', 'gender', 'race', 'cigsmok']
     numericals = ['age', 'BMI', 'pkyr', 'smokeage', 'smokeday', 'smokeyr']
