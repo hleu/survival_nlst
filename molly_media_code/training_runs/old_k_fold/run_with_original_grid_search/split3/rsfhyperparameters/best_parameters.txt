@@ -1,0 +1,17 @@
+RSF best model: RandomSurvivalForest(max_features='sqrt', random_state=20)
+best n_estivators on train: 1000
+best min_samples_split on train: 2
+best min_samples_leaf on train: 1
+score: 0.9079535724479117RSF best model: RandomSurvivalForest(max_features='sqrt', random_state=20)
+best n_estivators on train: 1000
+best min_samples_split on train: 2
+best min_samples_leaf on train: 1
+score: 0.780610788697555RSF best model: RandomSurvivalForest(max_features='sqrt', random_state=20)
+best n_estivators on train: 1000
+best min_samples_split on train: 2
+best min_samples_leaf on train: 1
+score: 0.916278184758824RSF best model: RandomSurvivalForest(max_features='sqrt', random_state=20)
+best n_estivators on train: 1000
+best min_samples_split on train: 2
+best min_samples_leaf on train: 1
+score: 0.8898297022167253

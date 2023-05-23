@@ -1,0 +1,12 @@
+clinical
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=10.0,                 l1_ratio=0)
+best test score: 0.4606205250596659
+radiomics1
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=1.0,                 l1_ratio=0)
+best test score: 0.6252983293556086
+radiomics2
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=1.0,                 l1_ratio=0)
+best test score: 0.5513126491646778
+radiomics3
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=100.0,                 l1_ratio=0)
+best test score: 0.5322195704057279

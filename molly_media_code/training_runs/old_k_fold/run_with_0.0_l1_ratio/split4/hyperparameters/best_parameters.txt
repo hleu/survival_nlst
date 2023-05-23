@@ -1,0 +1,13 @@
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.028117686979742307, l1_ratio=0.0)
+best l1_ratio on train: 0.0
+best penalizer on train: 0.0001
+lifelines c index: 0.6624147137347968score: 0.6624147137347968CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.008685113737513529, l1_ratio=0.0)
+best l1_ratio on train: 0.0
+best penalizer on train: 0.00040949150623804275
+lifelines c index: 0.6670621971719569score: 0.6670621971719569CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=1.9306977288832496, l1_ratio=0.0)
+best l1_ratio on train: 0.0
+best penalizer on train: 0.00040949150623804275
+lifelines c index: 0.6026896074359736score: 0.6026896074359736CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.29470517025518095, l1_ratio=0.0)
+best l1_ratio on train: 0.0
+best penalizer on train: 0.0001
+lifelines c index: 0.5918125185404924score: 0.5918125185404924

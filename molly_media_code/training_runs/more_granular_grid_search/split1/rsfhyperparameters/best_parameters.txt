@@ -1,0 +1,16 @@
+clinical
+RSF best model: RandomSurvivalForest(max_features='sqrt', min_samples_leaf=1,
+                     min_samples_split=4, n_estimators=10, random_state=20)
+best test score: 0.6539379474940334
+radiomics1
+RSF best model: RandomSurvivalForest(max_features='sqrt', min_samples_leaf=15,
+                     min_samples_split=2, random_state=20)
+best test score: 0.5644391408114559
+radiomics2
+RSF best model: RandomSurvivalForest(max_features='sqrt', min_samples_leaf=4,
+                     min_samples_split=2, n_estimators=10, random_state=20)
+best test score: 0.522673031026253
+radiomics3
+RSF best model: RandomSurvivalForest(max_features='sqrt', min_samples_leaf=4,
+                     min_samples_split=2, n_estimators=10, random_state=20)
+best test score: 0.5763723150357996

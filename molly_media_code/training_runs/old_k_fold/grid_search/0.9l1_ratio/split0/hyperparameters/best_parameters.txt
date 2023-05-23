@@ -1,0 +1,5 @@
+CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.01, l1_ratio=0.9)
+lifelines c index: 0.6152610441767068score: 0.6152610441767068CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.01, l1_ratio=0.9)
+lifelines c index: 0.6303212851405623score: 0.6303212851405623CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=1.0, l1_ratio=0.9)
+lifelines c index: 0.6012048192771084score: 0.6012048192771084CPH_lifelines best model: lifelines.CoxPHFitter(penalizer=0.001, l1_ratio=0.9)
+lifelines c index: 0.5921686746987952score: 0.5921686746987952
