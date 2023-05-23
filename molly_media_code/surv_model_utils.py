@@ -1,6 +1,3 @@
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from glob import glob
 import os
 import csv
@@ -17,6 +14,7 @@ from sklearn.impute import SimpleImputer
 from sklearn_pandas import DataFrameMapper
 from sklearn.feature_selection import SelectKBest
 from sklearn.model_selection import GridSearchCV, KFold
+from sklearn.metrics import make_scorer
 
 from sksurv.preprocessing import OneHotEncoder
 from sksurv.util import Surv
@@ -29,61 +27,100 @@ import sksurv.datasets as skds
 
 from lifelines import CoxPHFitter
 from lifelines.utils.sklearn_adapter import sklearn_adapter
+from lifelines.utils import concordance_index
 
 import eli5
 from eli5.sklearn import PermutationImportance
 
 import matplotlib.pyplot as plt
 import matplotlib
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 plt.rcParams['figure.figsize'] = [12, 7]
 matplotlib.rcParams.update({'font.size': 18})
 random_state = 20
 n_jobs=None
 cv=None
-# cv = KFold(n_splits=10, random_state=random_state, shuffle=True)
+hyper_name = "hyperparameters"
 
-def cox_ph(x_train, x_test, y_train, y_test, df_train, df_test):
+def cox_ph(x, y, df, dir_name, use_case, train_indices, val_indices):
     # print("Starting CPH_lifelines model")
-    x_train_lifelines = x_train.join(df_train[['days_1stpos_death', 'death_cancer']])
-    x_test_lifelines = x_test.join(df_test[['days_1stpos_death', 'death_cancer']])
-
-    df_trains = x_train_lifelines.copy()
-    y_train_ll = df_trains.pop('days_1stpos_death')
-    x_train_ll = df_trains
+    x_lifelines = x.join(df[['days_1stpos_death', 'death_cancer']])
+      
+    x_lifelines_copy = x_lifelines.copy()
+    y_ll = x_lifelines_copy.pop('days_1stpos_death')
+    x_ll = x_lifelines_copy
     
-    df_tests = x_test_lifelines.copy()
-    y_test_ll = df_tests.pop('days_1stpos_death')
-    x_test_ll = df_tests
-
     #import ipdb
     #ipdb.set_trace()
 
     base_class = sklearn_adapter(CoxPHFitter, event_col='death_cancer')
     bclass = base_class()
-    param_grid = {"penalizer": 10.0 ** np.arange(-3, 4),
-                  "l1_ratio": [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]}
-    gcv = GridSearchCV(bclass, param_grid, cv=cv)
+    param_grid = {"penalizer": 10.0 ** np.arange(-3,4),
+                  "l1_ratio": [0]}
+    
+    gcv = GridSearchCV(bclass, param_grid, cv=[(train_indices, val_indices)], return_train_score=True, \
+                       refit=False)
 
     warnings.simplefilter("ignore")
-    gcv.fit(x_train_ll, y_train_ll)
+    gcv.fit(x_ll, y_ll)
     warnings.resetwarnings()
+    warnings.filterwarnings("ignore", category=FutureWarning)
 
-    print(f"CPH_lifelines best model: lifelines.CoxPHFitter(penalizer={gcv.best_params_['penalizer']}, l1_ratio={gcv.best_params_['l1_ratio']})")
-    pr = gcv.predict(x_train_ll)   
+    print(f"CPH_lifelines best model: lifelines.CoxPHFitter(penalizer={gcv.best_params_['penalizer']}, \
+          l1_ratio={gcv.best_params_['l1_ratio']})")
+    
+    #############################
+    if not os.path.exists(dir_name):
+        os.mkdir(dir_name)
+    path = dir_name + "/" + hyper_name
+    if not os.path.exists(path):
+        os.mkdir(path)
+    f_tmp = open(path + "/" + "best_parameters.txt", "a")
+    f_tmp.write(use_case + "\n")
+    f_tmp.write(f"CPH_lifelines best model: lifelines.CoxPHFitter(penalizer={gcv.best_params_['penalizer']}, \
+                l1_ratio={gcv.best_params_['l1_ratio']})\n")
+    f_tmp.write("best test score: " + str(gcv.best_score_) + "\n")
+    f_tmp.close()
+    
+    np.save(path + '/' + use_case + "_penalizer", gcv.cv_results_['param_penalizer'])
+    np.save(path + '/' + use_case + "_l1_ratio", gcv.cv_results_['param_l1_ratio'])
+    np.save(path + '/' + use_case + "_mean_test", gcv.cv_results_['mean_test_score'])
+    np.save(path + '/' + use_case + "_mean_train", gcv.cv_results_['mean_train_score'])
+    np.save(path + '/' + use_case + "_mean_fit_time", gcv.cv_results_['mean_fit_time'])
+    np.save(path + '/' + use_case + "_mean_score_time", gcv.cv_results_['mean_score_time'])
+    
+    ##################################
+    
     cph = CoxPHFitter(l1_ratio=gcv.best_params_['l1_ratio'],
-                      penalizer=gcv.best_params_['penalizer'])
-    cph.fit(x_train_lifelines, duration_col='days_1stpos_death', event_col='death_cancer', initial_point=np.random.rand(x_train.shape[1]))
-
+              penalizer=gcv.best_params_['penalizer'])
+    
+    x_train_lifelines = x_lifelines.iloc[train_indices]
+    y_train = y[train_indices]
+    
+    x_val_lifelines = x_lifelines.iloc[val_indices]
+    y_val = y[val_indices]
+    
+    #take away train subset and validate on validation subset
+    cph.fit(x_train_lifelines, duration_col='days_1stpos_death', event_col='death_cancer')
+    np.save(path + '/' + use_case + "_coefficients", cph.params_)
+        
     prediction_cph_train = -cph.predict_expectation(x_train_lifelines)
-    prediction_cph_test = -cph.predict_expectation(x_test_lifelines)
-
-    cindex_cph_train = concordance_index_censored(y_train["death_cancer"], 
-                                                          y_train["days_1stpos_death"],
-                                                          prediction_cph_train)
-    cindex_cph_test = concordance_index_censored(y_test["death_cancer"], 
-                                                         y_test["days_1stpos_death"], 
-                                                         prediction_cph_test)
-    return cph, prediction_cph_train, prediction_cph_test, cindex_cph_train, cindex_cph_test
+    
+    cindex_cph_train = concordance_index_censored(y_train["death_cancer"], y_train["days_1stpos_death"], \
+                                                  prediction_cph_train)
+    
+    assert (cindex_cph_train[0] == gcv.cv_results_['mean_train_score'][np.argmax(gcv.cv_results_['mean_test_score'])])
+    
+    prediction_cph_val = -cph.predict_expectation(x_val_lifelines)
+    
+    cindex_cph_val = concordance_index_censored(y_val["death_cancer"], y_val["days_1stpos_death"], prediction_cph_val)
+    
+    assert (cindex_cph_val[0] == gcv.best_score_)
+    
+    return cph, prediction_cph_train, prediction_cph_val, cindex_cph_train, cindex_cph_val
 
 def cox_ph_sksurv(x_train, x_test, y_train, y_test):
     '''
@@ -114,49 +151,76 @@ def cox_ph_sksurv(x_train, x_test, y_train, y_test):
                                                          prediction_cph_test)
     return cph, prediction_cph_train, prediction_cph_test, cindex_cph_train, cindex_cph_test
 
-def rsf(x_train, x_test, y_train, y_test):
+def rsf(x, y, dir_name, use_case, train_indices, val_indices):
     # print("Starting RSF model")
     rsf = RandomSurvivalForest(max_features="sqrt", random_state=random_state)
     param_grid = {"n_estimators":[10, 100, 1000],
                  "min_samples_split":[2, 4, 6, 8, 10],
                  "min_samples_leaf":[1, 4, 15]}
-    gcv = GridSearchCV(rsf, param_grid, n_jobs=n_jobs, cv=cv)
+    gcv = GridSearchCV(rsf, param_grid, n_jobs=n_jobs, cv=[(train_indices, val_indices)], return_train_score=True, refit=False)
 
     warnings.simplefilter("ignore")
-    gcv.fit(x_train, y_train)
+    gcv.fit(x, y)
     warnings.resetwarnings()
-
+    
     rsf.set_params(**gcv.best_params_)
+    
+    print(f"RSF best model: {gcv.best_params_}")
+    
+    #############################
+    
+    if not os.path.exists(dir_name):
+        os.mkdir(dir_name)
+    path = dir_name + "/" + "rsf" + hyper_name
+    if not os.path.exists(path):
+        os.mkdir(path)
+    f_tmp = open(path + "/" + "best_parameters.txt", "a")
+    f_tmp.write(use_case + "\n")
+    f_tmp.write(f"RSF best model: {rsf}\n")
+    f_tmp.write("best test score: " + str(gcv.best_score_) + "\n")
+    f_tmp.close()
+    
+    np.save(path + '/' + use_case + "_n_estimators", gcv.cv_results_['param_n_estimators'])
+    np.save(path + '/' + use_case + "_min_samples_split", gcv.cv_results_['param_min_samples_split'])
+    np.save(path + '/' + use_case + "_min_samples_leaf", gcv.cv_results_['param_min_samples_leaf'])
+    np.save(path + '/' + use_case + "_mean_test", gcv.cv_results_['mean_test_score'])
+    np.save(path + '/' + use_case + "_mean_train", gcv.cv_results_['mean_train_score'])
+    np.save(path + '/' + use_case + "_mean_fit_time", gcv.cv_results_['mean_fit_time'])
+    np.save(path + '/' + use_case + "_mean_score_time", gcv.cv_results_['mean_score_time'])
+    
+    ##################################
+    
+    x_train = x.iloc[train_indices]
+    y_train = y[train_indices]
+    
+    x_val = x.iloc[val_indices]
+    y_val = y[val_indices]
 
-    print(f"RSF best model: {rsf}")
     rsf.fit(x_train, y_train)
 
     prediction_rsf_train = rsf.predict(x_train)
-    prediction_rsf_test = rsf.predict(x_test)
+    prediction_rsf_val = rsf.predict(x_val)
 
-    cindex_rsf_train = concordance_index_censored(y_train["death_cancer"], 
-                                                          y_train["days_1stpos_death"],
-                                                          prediction_rsf_train)
-    cindex_rsf_test = concordance_index_censored(y_test["death_cancer"], 
-                                                         y_test["days_1stpos_death"],
-                                                         prediction_rsf_test)
-    return rsf, prediction_rsf_train, prediction_rsf_test, cindex_rsf_train, cindex_rsf_test
+    cindex_rsf_train = concordance_index_censored(y_train["death_cancer"], y_train["days_1stpos_death"], \
+                                                  prediction_rsf_train)
+    
+    assert (cindex_rsf_train[0] == gcv.cv_results_['mean_train_score'][np.argmax(gcv.cv_results_['mean_test_score'])])
+    
+    cindex_rsf_val = concordance_index_censored(y_val["death_cancer"], y_val["days_1stpos_death"], \
+                                                prediction_rsf_val)
+    
+    assert (cindex_rsf_val[0] == gcv.best_score_)
+    
+    return rsf, prediction_rsf_train, prediction_rsf_val, cindex_rsf_train, cindex_rsf_val
+
 
 def compare_td_aucs(y_train, y_test, prediction_cph_test, prediction_rsf_test, title_suffix, fig_suffix, dir_name, label_suffix='', reset=False):
+    
+    assert (len(y_train) > len(y_test))
+    assert (len(y_test) == len(prediction_cph_test) and len(y_test) == len(prediction_rsf_test))
+    
     if reset is True:
         plt.figure()
-    
-#     y_test_mod = []
-#     for val in y_test:
-#         e, d = val
-#         if (d<141.0):
-#             d = 141.0
-#         if (d>2463):
-#             d = 2463
-#         y_test_mod.append((e, d ))
-#     y_test_mod=np.array(y_test_mod, dtype=y_test.dtype)
-
-#     va_times = np.arange(141, 2463, 30)
     
     test_min = np.inf
     test_max = 0
@@ -199,7 +263,11 @@ def compare_td_aucs(y_train, y_test, prediction_cph_test, prediction_rsf_test, t
 
 def get_feature_importances_rsf(model, x_train, x_test, y_train,
         feature_names, weight_suffix, dir_name): 
-
+    
+    assert (x_train.shape[0] == len(y_train))
+    assert (x_train.shape[1] == len(feature_names))
+    assert (x_train.shape[0] > len(x_test))
+    
     perm = PermutationImportance(model, n_iter=15, random_state=random_state)
     perm.fit(x_train, y_train)
     w = eli5.show_weights(perm, feature_names=feature_names)
@@ -219,6 +287,12 @@ def get_feature_importances_rsf(model, x_train, x_test, y_train,
     return features
 
 def get_feature_importances_cph(model, x_train, x_test, y_train, df_train, df_test, feature_names, weight_suffix, dir_name): 
+    
+    assert (x_train.shape[0] == len(y_train) and x_train.shape[0] == df_train.shape[0])
+    assert (x_test.shape[0] == df_test.shape[0])
+    assert (x_train.shape[1] == len(feature_names) and x_test.shape[1] == len(feature_names))
+    assert (x_train.shape[0] > len(x_test))
+    
     x_train_lifelines = x_train.join(df_train[['days_1stpos_death', 'death_cancer']])
     x_test_lifelines = x_test.join(df_test[['days_1stpos_death', 'death_cancer']])
 

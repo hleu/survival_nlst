@@ -1,9 +1,7 @@
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 from glob import glob
 import os
 import csv
+import pickle
     
 import pandas as pd
 import numpy as np
@@ -35,6 +33,10 @@ from eli5.sklearn import PermutationImportance
 import matplotlib.pyplot as plt
 import matplotlib
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+
 ### UPDATE THESE BEFORE RUNNING
 data_root = '../data/' # Location of PIDS (pids.txt)
 csv_path = '../data/' # Location of nlst_15kpct_prsn_062119.csv'
@@ -52,42 +54,58 @@ matplotlib.rcParams.update({'font.size': 18})
 random_state = 20
 np.random_state = 20
 
-def run_surv(use_case, run_type, x_train, x_test, y_train, y_test, df_train, df_test, kfold_idx):
+def run_surv(use_case, run_type, x, y, df, kfold_idx, train_indices, val_indices):
     dir_name = "split" + str(kfold_idx)
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
         
     f = open(dir_name + "/" + result_file, "a")
 
-    cph_model, cph_pred_train, cph_pred_test, cph_cindex_train, cph_cindex_test = \
-    cox_ph(x_train, x_test, y_train, y_test, df_train, df_test)
-
-    rsf_model, rsf_pred_train, rsf_pred_test, rsf_cindex_train, rsf_cindex_test = \
-    rsf(x_train, x_test, y_train, y_test)
-
+    cph_model, cph_pred_train, cph_pred_val, cph_cindex_train, cph_cindex_val = \
+    cox_ph(x, y, df, dir_name, use_case, train_indices, val_indices)
+    
+    rsf_model, rsf_pred_train, rsf_pred_val, rsf_cindex_train, rsf_cindex_val = \
+        rsf(x, y, dir_name, use_case, train_indices, val_indices)
+    
+    y_train = y[train_indices]
+    y_val = y[val_indices]
+    
     cph_mtdauc, rsf_mtdauc = \
-    compare_td_aucs(y_train, y_test, cph_pred_test, rsf_pred_test, f"- {use_case}-{run_type}", f"{use_case}_{run_type}", dir_name, reset=True)
+    compare_td_aucs(y_train, y_val, cph_pred_val, rsf_pred_val, f"- {use_case}-{run_type}", f"{use_case}_{run_type}", dir_name, reset=True)
 
-    CPH_liflines_res = f"CPH_lifelines-{use_case}-{run_type} \t {round(cph_cindex_test[0]*100,2)} \t {round(cph_mtdauc*100,2)}"
-    RSF_res = f"RSF-{use_case}-{run_type} \t {round(rsf_cindex_test[0]*100,2)} \t {round(rsf_mtdauc*100,2)}"
+    CPH_liflines_res = f"CPH_lifelines-{use_case}-{run_type} \t {round(cph_cindex_val[0]*100,2)} \t {round(cph_mtdauc*100,2)}"
+    RSF_res = f"RSF-{use_case}-{run_type} \t {round(rsf_cindex_val[0]*100,2)} \t {round(rsf_mtdauc*100,2)}"
     f.write(f"{CPH_liflines_res}\n")
     f.write(f"{RSF_res}\n")
     f.close()
     return cph_model, rsf_model
 
-def perform_all_test(use_case, x_train, x_test, y_train, y_test, df_train, df_test, feature_names, kfold_idx, subset=[]):
-    cph_model, rsf_model = run_surv(use_case, 'all', x_train, x_test, y_train, y_test, df_train, df_test, kfold_idx)
-
+def perform_all_test(use_case, x, y, df, feature_names, kfold_idx, train_indices, val_indices, subset=[]):
+    cph_model, rsf_model = run_surv(use_case, 'all', x, y, df, kfold_idx, train_indices, val_indices)
+        
     # TODO: overwrite if directory already exists
     dir_name = "split" + str(kfold_idx)
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
         
-    cph_subset = get_feature_importances_cph(cph_model, x_train, x_test, y_train, \
-    df_train, df_test, feature_names, f'cph_{use_case}_all', dir_name)
+    with open(os.path.join(dir_name, use_case + "_cph.pickle"), "wb") as f:
+        pickle.dump(cph_model, f)
+        
+    with open(os.path.join(dir_name, use_case + "_rsf.pickle"), "wb") as f:
+        pickle.dump(rsf_model, f)
+    
+    x_train = x.iloc[train_indices]
+    y_train = y[train_indices]
+    df_train = df.iloc[train_indices]
+    
+    x_val = x.iloc[val_indices]
+    df_val = df.iloc[val_indices]
+    
+    cph_subset = get_feature_importances_cph(cph_model, x_train, x_val, y_train, df_train, df_val, \
+                                             feature_names, f'cph_{use_case}_all', dir_name)
 
-    rsf_subset = get_feature_importances_rsf(rsf_model, x_train, x_test, y_train, \
-        feature_names, f'rsf_{use_case}_all', dir_name)
+    rsf_subset = get_feature_importances_rsf(rsf_model, x_train, x_val, y_train, feature_names, \
+                                             f'rsf_{use_case}_all', dir_name)
 
     print(f"Most important CPH-{use_case} subset names:", cph_subset)
     print(f"Most important RSF-{use_case} subset names:", rsf_subset)
@@ -104,74 +122,70 @@ def perform_all_test(use_case, x_train, x_test, y_train, y_test, df_train, df_te
     f_tmp.close()
 
     if len(subset) > 0:
-        x_train_subset = x_train[subset]
-        x_test_subset = x_test[subset]
+        x_subset = x[subset]
        
-        _,_ = run_surv(use_case, 'subset', x_train_subset, x_test_subset, y_train, y_test, df_train, df_test, kfold_idx)
+        _,_ = run_surv(use_case, 'subset', x_subset, y, df, kfold_idx, train_indices, val_indices)
 
 def main():
     train_pos, val_pos, test_pos, _, _, _ = get_pids_split(data_root+'pids.txt')
-    pos_pids = np.array(train_pos + val_pos + test_pos)
+    train_pids = train_pos + val_pos
+    test_pids = test_pos
 
     kf = KFold(5, shuffle=True, random_state=1234)
 
-    for split_idx, (train_index, test_index) in enumerate(kf.split(pos_pids)):
+    prsndf = pd.read_csv(csv_path+'nlst_15kpct_prsn_062119.csv')
+    prsndf = prsndf[prsndf['scr_group']== 1] # cancer positive
+
+    pids_radiomics = []
+    radiomics = []
+    for f in file_list:
+        pids_radiomics.append(int(f.split('/')[-1].split('.')[0]))
+        radiomics.append(np.load(f)['arr_0'])
+    radiomics = np.array(radiomics)
+    df_radiomics = pd.DataFrame(radiomics, columns=[str(i) for i in range(np.shape(radiomics)[1])], index=pids_radiomics)
+
+    prsndf = prsndf[prsndf['pid'].isin(pids_radiomics)]
+    prsndf_rad = prsndf.join(df_radiomics, on='pid')
+    raddf = prsndf_rad.iloc[:,-107:]
+    numericals = [str(i) for i in range (107)]
+
+    #########################################################
+    print("Clinical only:")
+    x_train, y_train, df_train = parse_clinical(train_pids, prsndf)
+    x_test, y_test, df_test = parse_clinical(test_pids, prsndf)
+
+    clin_feature_names = [
+        'Age',
+        'BMI',
+        'Pack-year',
+        'Smoking-start-age',
+        'Cigarettes-per-day',
+        'Number-of-smoking-years',
+        'High-school-graduate',
+        'Post-HS-training',
+        'Associate-degree',
+        'Bachelors-degree',
+        'Graduate-school',
+        'Female',
+        'Non-white',
+        'Smoking-at-the-start-of-trial',
+        'Lived-with-smoker',
+        'Worked-with-smoker',
+        'Cancer-prior-to-trial',
+        'Family-member-had-cancer']
+
+    x_test = x_test.reindex(columns=list(x_train))
+
+    for split_idx, (train_indices, val_indices) in enumerate(kf.split(x_train)):
         
-        if split_idx != 1:
-            continue
-
-        train_pids = pos_pids[list(train_index)]
-        test_pids = pos_pids[list(test_index)]
-
-        prsndf = pd.read_csv(csv_path+'nlst_15kpct_prsn_062119.csv')
-        prsndf = prsndf[prsndf['scr_group']== 1] # cancer positive
-
-        pids_radiomics = []
-        radiomics = []
-        for f in file_list:
-            pids_radiomics.append(int(f.split('/')[-1].split('.')[0]))
-            radiomics.append(np.load(f)['arr_0'])
-        radiomics = np.array(radiomics)
-        df_radiomics = pd.DataFrame(radiomics, columns=[str(i) for i in range(np.shape(radiomics)[1])], index=pids_radiomics)
-
-        prsndf = prsndf[prsndf['pid'].isin(pids_radiomics)]
-        prsndf_rad = prsndf.join(df_radiomics, on='pid')
-        raddf = prsndf_rad.iloc[:,-107:]
-        numericals = [str(i) for i in range (107)]
-
-        #########################################################
-        print("Clinical only:")
-        x_train, y_train, df_train = parse_clinical(train_pids, prsndf)
-        x_test, y_test, df_test = parse_clinical(test_pids, prsndf)
-
-        clin_feature_names = [
-            'Age',
-            'BMI',
-            'Pack-year',
-            'Smoking-start-age',
-            'Cigarettes-per-day',
-            'Number-of-smoking-years',
-            'High-school-graduate',
-            'Post-HS-training',
-            'Associate-degree',
-            'Bachelors-degree',
-            'Graduate-school',
-            'Female',
-            'Non-white',
-            'Smoking-at-the-start-of-trial',
-            'Lived-with-smoker',
-            'Worked-with-smoker',
-            'Cancer-prior-to-trial',
-            'Family-member-had-cancer']
-
-        x_test = x_test.reindex(columns=list(x_train))
-
         #import ipdb
         #ipdb.set_trace()
         # NOTE: Commenting out subset model until feature analysis complete
         # clin_subset = ['BMI', 'pkyr','gender=2.0','personal_cancer=1.0','smokeage', 'smokework=1.0']
+
         clin_subset = []
-        perform_all_test('clinical', x_train, x_test, y_train, y_test, df_train, df_test, clin_feature_names, split_idx, clin_subset)
+        perform_all_test('clinical', x_train, y_train, df_train, clin_feature_names, split_idx, \
+                         train_indices, val_indices, clin_subset)
 
         ###################################################################
         print("\nRadiomics features only:")
@@ -226,21 +240,24 @@ def main():
         # NOTE: Commenting out subset model until feature analysis complete
         # radiomics1_subset = ['original_shape_Maximum2DDiameterColumn', 'original_shape_Maximum2DDiameterRow','original_shape_Maximum3DDiameter', 'original_shape_Sphericity', 'original_shape_VoxelVolume', 'original_shape_Maximum2DDiameterSlice']
         radiomics1_subset = []
-        perform_all_test('radiomics1', x_train_rad1, x_test_rad1, y_train, y_test, df_train, df_test, rad1_feature_names, split_idx, radiomics1_subset)
+        perform_all_test('radiomics1', x_train_rad1, y_train, df_train, rad1_feature_names, split_idx, \
+                         train_indices, val_indices, radiomics1_subset)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics2:")
         # NOTE: Commenting out subset model until feature analysis complete
         # radiomics2_subset = ['original_firstorder_Energy', 'original_firstorder_Kurtosis','original_firstorder_Maximum', 'original_firstorder_Median', 'original_firstorder_90Percentile', 'original_firstorder_RootMeanSquared']
         radiomics2_subset = []
-        perform_all_test('radiomics2', x_train_rad2, x_test_rad2, y_train, y_test, df_train, df_test, rad2_feature_names, split_idx, radiomics2_subset)
+        perform_all_test('radiomics2', x_train_rad2, y_train, df_train, rad2_feature_names, split_idx, \
+                         train_indices, val_indices, radiomics2_subset)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics3:")
         # NOTE: Commenting out subset model until feature analysis complete
         #radiomics3_subset = ['original_ngtdm_Busyness', 'original_firstorder_RootMeanSquared']
         radiomics3_subset = []
-        perform_all_test('radiomics3', x_train_rad3, x_test_rad3, y_train, y_test, df_train, df_test, rad3_feature_names, split_idx, [])
+        perform_all_test('radiomics3', x_train_rad3, y_train, df_train, rad3_feature_names, split_idx, \
+                         train_indices, val_indices, [])
 
         ################################################################
         # Generate and use combination of features. 
