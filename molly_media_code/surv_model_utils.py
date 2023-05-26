@@ -58,8 +58,8 @@ def cox_ph(x, y, df, dir_name, use_case, train_indices, val_indices):
 
     base_class = sklearn_adapter(CoxPHFitter, event_col='death_cancer')
     bclass = base_class()
-    param_grid = {"penalizer": 10.0 ** np.arange(-3,4),
-                  "l1_ratio": [0]}
+    param_grid = {"penalizer": 10.0 ** np.arange(-3, 4),
+                  "l1_ratio": [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]}
     
     gcv = GridSearchCV(bclass, param_grid, cv=[(train_indices, val_indices)], return_train_score=True, \
                        refit=False)

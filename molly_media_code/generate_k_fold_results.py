@@ -180,12 +180,14 @@ def main():
         
         #import ipdb
         #ipdb.set_trace()
-        # NOTE: Commenting out subset model until feature analysis complete
-        # clin_subset = ['BMI', 'pkyr','gender=2.0','personal_cancer=1.0','smokeage', 'smokework=1.0']
 
-        clin_subset = []
-        perform_all_test('clinical', x_train, y_train, df_train, clin_feature_names, split_idx, \
-                         train_indices, val_indices, clin_subset)
+#         clin_subset = []
+#         perform_all_test('clinical', x_train, y_train, df_train, clin_feature_names, split_idx, \
+#                          train_indices, val_indices, clin_subset)
+        
+        clin_subset = ["BMI", "smokeyr", "age", "personal_cancer=1.0", "fam_cancer=1.0", "educat=3.0"]
+        x_train_subset = x_train[clin_subset]
+        _,_ = run_surv('clinical', 'subset', x_train_subset, y_train, df_train, split_idx, train_indices, val_indices)
 
         ###################################################################
         print("\nRadiomics features only:")
@@ -237,27 +239,38 @@ def main():
 
         ##########################################################
         print("\nRadiomics1:")
-        # NOTE: Commenting out subset model until feature analysis complete
-        # radiomics1_subset = ['original_shape_Maximum2DDiameterColumn', 'original_shape_Maximum2DDiameterRow','original_shape_Maximum3DDiameter', 'original_shape_Sphericity', 'original_shape_VoxelVolume', 'original_shape_Maximum2DDiameterSlice']
-        radiomics1_subset = []
-        perform_all_test('radiomics1', x_train_rad1, y_train, df_train, rad1_feature_names, split_idx, \
-                         train_indices, val_indices, radiomics1_subset)
+
+#         radiomics1_subset = []
+#         perform_all_test('radiomics1', x_train_rad1, y_train, df_train, rad1_feature_names, split_idx, \
+#                          train_indices, val_indices, radiomics1_subset)
+        radiomics1_subset = ["original_shape_SurfaceArea", "original_shape_Maximum3DDiameter", \
+                             "original_shape_Maximum2DDiameterColumn", "original_shape_MajorAxisLength", \
+                             "original_shape_Sphericity", "original_shape_LeastAxisLength"]
+    
+        x_train_rad1_subset = x_train_rad1[radiomics1_subset]
+        _,_ = run_surv('radiomics1', 'subset', x_train_rad1_subset, y_train, df_train, split_idx, train_indices, \
+                       val_indices)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics2:")
-        # NOTE: Commenting out subset model until feature analysis complete
-        # radiomics2_subset = ['original_firstorder_Energy', 'original_firstorder_Kurtosis','original_firstorder_Maximum', 'original_firstorder_Median', 'original_firstorder_90Percentile', 'original_firstorder_RootMeanSquared']
-        radiomics2_subset = []
-        perform_all_test('radiomics2', x_train_rad2, y_train, df_train, rad2_feature_names, split_idx, \
-                         train_indices, val_indices, radiomics2_subset)
+        
+#         radiomics2_subset = []
+#         perform_all_test('radiomics2', x_train_rad2, y_train, df_train, rad2_feature_names, split_idx, \
+#                          train_indices, val_indices, radiomics2_subset)
+
+        radiomics2_subset = ['original_firstorder_90Percentile', 'original_firstorder_Energy', \
+                             'original_firstorder_RootMeanSquared', 'original_firstorder_Maximum', \
+                             'original_firstorder_Median', 'original_firstorder_Kurtosis']
+        x_train_rad2_subset = x_train_rad2[radiomics2_subset]
+        _,_ = run_surv('radiomics2', 'subset', x_train_rad2_subset, y_train, df_train, split_idx, train_indices, \
+                       val_indices)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics3:")
-        # NOTE: Commenting out subset model until feature analysis complete
-        #radiomics3_subset = ['original_ngtdm_Busyness', 'original_firstorder_RootMeanSquared']
-        radiomics3_subset = []
-        perform_all_test('radiomics3', x_train_rad3, y_train, df_train, rad3_feature_names, split_idx, \
-                         train_indices, val_indices, [])
+        
+#         radiomics3_subset = []
+#         perform_all_test('radiomics3', x_train_rad3, y_train, df_train, rad3_feature_names, split_idx, \
+#                          train_indices, val_indices, [])
 
         ################################################################
         # Generate and use combination of features. 
