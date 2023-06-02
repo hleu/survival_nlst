@@ -42,7 +42,7 @@ data_root = '../data/' # Location of PIDS (pids.txt)
 csv_path = '../data/' # Location of nlst_15kpct_prsn_062119.csv'
 file_list = glob('../data/pyradiomics_features/'+'/*') # Location of the pyradiomics features
 radiomics_feature_name_file = '../data/' #Location of pyradiomics_features.txt
-result_file = './results.txt'
+# result_file = './results.txt'
 subset_file = './subset.txt'
 
 #data_root = '/mnt/nlst/' # Location of PIDS (pids.txt)
@@ -58,14 +58,14 @@ def run_surv(use_case, run_type, x, y, df, kfold_idx, train_indices, val_indices
     dir_name = "split" + str(kfold_idx)
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
-        
-    f = open(dir_name + "/" + result_file, "a")
+    
+    f = open(os.path.join(dir_name, f"results_{run_type}.txt"), "a")
 
     cph_model, cph_pred_train, cph_pred_val, cph_cindex_train, cph_cindex_val = \
-    cox_ph(x, y, df, dir_name, use_case, train_indices, val_indices)
+    cox_ph(x, y, df, dir_name, use_case, run_type, train_indices, val_indices)
     
     rsf_model, rsf_pred_train, rsf_pred_val, rsf_cindex_train, rsf_cindex_val = \
-        rsf(x, y, dir_name, use_case, train_indices, val_indices)
+        rsf(x, y, dir_name, use_case, run_type, train_indices, val_indices)
     
     y_train = y[train_indices]
     y_val = y[val_indices]
@@ -80,18 +80,18 @@ def run_surv(use_case, run_type, x, y, df, kfold_idx, train_indices, val_indices
     f.close()
     return cph_model, rsf_model
 
-def perform_all_test(use_case, x, y, df, feature_names, kfold_idx, train_indices, val_indices, subset=[]):
-    cph_model, rsf_model = run_surv(use_case, 'all', x, y, df, kfold_idx, train_indices, val_indices)
+def perform_all_test(use_case, run_type, x, y, df, feature_names, kfold_idx, train_indices, val_indices):
+    cph_model, rsf_model = run_surv(use_case, run_type, x, y, df, kfold_idx, train_indices, val_indices)
         
     # TODO: overwrite if directory already exists
     dir_name = "split" + str(kfold_idx)
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
         
-    with open(os.path.join(dir_name, use_case + "_cph.pickle"), "wb") as f:
+    with open(os.path.join(dir_name, f'cph_{use_case}_{run_type}.pickle'), "wb") as f:
         pickle.dump(cph_model, f)
         
-    with open(os.path.join(dir_name, use_case + "_rsf.pickle"), "wb") as f:
+    with open(os.path.join(dir_name, f'rsf_{use_case}_{run_type}.pickle'), "wb") as f:
         pickle.dump(rsf_model, f)
     
     x_train = x.iloc[train_indices]
@@ -102,29 +102,30 @@ def perform_all_test(use_case, x, y, df, feature_names, kfold_idx, train_indices
     df_val = df.iloc[val_indices]
     
     cph_subset = get_feature_importances_cph(cph_model, x_train, x_val, y_train, df_train, df_val, \
-                                             feature_names, f'cph_{use_case}_all', dir_name)
+                                             feature_names, f'cph_{use_case}_{run_type}', dir_name)
 
     rsf_subset = get_feature_importances_rsf(rsf_model, x_train, x_val, y_train, feature_names, \
-                                             f'rsf_{use_case}_all', dir_name)
+                                             f'rsf_{use_case}_{run_type}', dir_name)
 
-    print(f"Most important CPH-{use_case} subset names:", cph_subset)
-    print(f"Most important RSF-{use_case} subset names:", rsf_subset)
+    ### Feature selection is currently being done offline
+#     print(f"Most important CPH-{use_case} subset names:", cph_subset)
+#     print(f"Most important RSF-{use_case} subset names:", rsf_subset)
         
-    f_tmp = open(dir_name + "/" + subset_file, "a")
-    f_tmp.write(use_case+'\n')
-    f_tmp.write("CPH: \n")
-    for v in cph_subset:
-        f_tmp.write(v+'\n')
-    f_tmp.write("RSF: \n")
-    for v in rsf_subset:
-        f_tmp.write(v+'\n')
-    f_tmp.write('\n')
-    f_tmp.close()
+#     f_tmp = open(dir_name + "/" + subset_file, "a")
+#     f_tmp.write(use_case+'\n')
+#     f_tmp.write("CPH: \n")
+#     for v in cph_subset:
+#         f_tmp.write(v+'\n')
+#     f_tmp.write("RSF: \n")
+#     for v in rsf_subset:
+#         f_tmp.write(v+'\n')
+#     f_tmp.write('\n')
+#     f_tmp.close()
 
-    if len(subset) > 0:
-        x_subset = x[subset]
+#     if len(subset) > 0:
+#         x_subset = x[subset]
        
-        _,_ = run_surv(use_case, 'subset', x_subset, y, df, kfold_idx, train_indices, val_indices)
+#         _,_ = run_surv(use_case, 'subset', x_subset, y, df, kfold_idx, train_indices, val_indices)
 
 def main():
     train_pos, val_pos, test_pos, _, _, _ = get_pids_split(data_root+'pids.txt')
@@ -182,13 +183,17 @@ def main():
         #ipdb.set_trace()
 
 #         clin_subset = []
-#         perform_all_test('clinical', x_train, y_train, df_train, clin_feature_names, split_idx, \
+#         perform_all_test('clinical', 'all', x_train, y_train, df_train, clin_feature_names, split_idx, \
 #                          train_indices, val_indices, clin_subset)
         
-        clin_subset = ["BMI", "smokeyr", "age", "personal_cancer=1.0", "fam_cancer=1.0", "educat=3.0"]
+        ## TODO: check that the subset and feature names work correctly/get better mapping to feature names
+        # drop "smokeyr", educat=5.0
+#         clin_subset = ['BMI', 'smokeyr', 'age', 'pkyr', 'smokeage'] # Uses RSF
+        clin_subset = ['gender=2.0', 'personal_cancer=1.0', 'race=other', 'smokelive=1.0', 'smokeage'] # Uses CPH
         x_train_subset = x_train[clin_subset]
-        _,_ = run_surv('clinical', 'subset', x_train_subset, y_train, df_train, split_idx, train_indices, val_indices)
-
+        perform_all_test('clinical', 'subset', x_train_subset, y_train, df_train, clin_subset, split_idx, train_indices, \
+                         val_indices)
+                         
         ###################################################################
         print("\nRadiomics features only:")
         rad_feature_names = []
@@ -241,29 +246,29 @@ def main():
         print("\nRadiomics1:")
 
 #         radiomics1_subset = []
-#         perform_all_test('radiomics1', x_train_rad1, y_train, df_train, rad1_feature_names, split_idx, \
+#         perform_all_test('radiomics1', 'all', x_train_rad1, y_train, df_train, rad1_feature_names, split_idx, \
 #                          train_indices, val_indices, radiomics1_subset)
-        radiomics1_subset = ["original_shape_SurfaceArea", "original_shape_Maximum3DDiameter", \
-                             "original_shape_Maximum2DDiameterColumn", "original_shape_MajorAxisLength", \
-                             "original_shape_Sphericity", "original_shape_LeastAxisLength"]
+#         radiomics1_subset = ['original_shape_MajorAxisLength', 'original_shape_Sphericity', 'original_shape_Elongation', 'original_shape_SurfaceVolumeRatio'] # uses RSF
+        radiomics1_subset = ['original_shape_Sphericity', 'original_shape_Maximum2DDiameterColumn', \
+                             'original_shape_Elongation', 'original_shape_SurfaceVolumeRatio']
     
         x_train_rad1_subset = x_train_rad1[radiomics1_subset]
-        _,_ = run_surv('radiomics1', 'subset', x_train_rad1_subset, y_train, df_train, split_idx, train_indices, \
-                       val_indices)
+        perform_all_test('radiomics1', 'subset', x_train_rad1_subset, y_train, df_train, radiomics1_subset, split_idx, \
+                         train_indices, val_indices)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics2:")
         
 #         radiomics2_subset = []
-#         perform_all_test('radiomics2', x_train_rad2, y_train, df_train, rad2_feature_names, split_idx, \
+#         perform_all_test('radiomics2', 'all', x_train_rad2, y_train, df_train, rad2_feature_names, split_idx, \
 #                          train_indices, val_indices, radiomics2_subset)
 
-        radiomics2_subset = ['original_firstorder_90Percentile', 'original_firstorder_Energy', \
-                             'original_firstorder_RootMeanSquared', 'original_firstorder_Maximum', \
-                             'original_firstorder_Median', 'original_firstorder_Kurtosis']
+#         radiomics2_subset = ['original_firstorder_Maximum', 'original_firstorder_Median', 'original_firstorder_Kurtosis', 'original_firstorder_TotalEnergy'] # uses RSF
+        radiomics2_subset = ['original_firstorder_Energy', 'original_firstorder_90Percentile', \
+                             'original_firstorder_Kurtosis', 'original_firstorder_10Percentile']
         x_train_rad2_subset = x_train_rad2[radiomics2_subset]
-        _,_ = run_surv('radiomics2', 'subset', x_train_rad2_subset, y_train, df_train, split_idx, train_indices, \
-                       val_indices)
+        perform_all_test('radiomics2', 'subset', x_train_rad2_subset, y_train, df_train, radiomics2_subset, split_idx, \
+                         train_indices, val_indices)
 
         #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         print("\nRadiomics3:")
@@ -271,6 +276,10 @@ def main():
 #         radiomics3_subset = []
 #         perform_all_test('radiomics3', x_train_rad3, y_train, df_train, rad3_feature_names, split_idx, \
 #                          train_indices, val_indices, [])
+        radiomics3_subset = ['original_glcm_JointEntropy', 'original_ngtdm_Busyness', 'original_glcm_SumAverage']
+        x_train_rad3_subset = x_train_rad3[radiomics3_subset]
+        perform_all_test('radiomics3', 'subset', x_train_rad3_subset, y_train, df_train, radiomics3_subset, split_idx, \
+                         train_indices, val_indices)
 
         ################################################################
         # Generate and use combination of features. 
