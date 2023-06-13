@@ -1,0 +1,12 @@
+clinical_all
+best model parameters: {'min_samples_leaf': 1, 'min_samples_split': 6, 'n_estimators': 10}
+best test score: 0.51319145245037 
+radiomics1_all
+best model parameters: {'min_samples_leaf': 15, 'min_samples_split': 2, 'n_estimators': 10}
+best test score: 0.6871128291231156 
+radiomics2_all
+best model parameters: {'min_samples_leaf': 4, 'min_samples_split': 2, 'n_estimators': 100}
+best test score: 0.6023004159912244 
+radiomics3_all
+best model parameters: {'min_samples_leaf': 4, 'min_samples_split': 10, 'n_estimators': 100}
+best test score: 0.6378926895775451 

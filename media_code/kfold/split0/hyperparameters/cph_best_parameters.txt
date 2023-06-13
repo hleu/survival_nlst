@@ -1,0 +1,12 @@
+clinical_all
+best model parameters: {'l1_ratio': 0, 'penalizer': 0.1}
+best test score: 0.45044211138305645 
+radiomics1_all
+best model parameters: {'l1_ratio': 0.6, 'penalizer': 0.01}
+best test score: 0.6124351154368697 
+radiomics2_all
+best model parameters: {'l1_ratio': 0, 'penalizer': 1.0}
+best test score: 0.5971029046796215 
+radiomics3_all
+best model parameters: {'l1_ratio': 0.2, 'penalizer': 0.01}
+best test score: 0.5866423024446179 
