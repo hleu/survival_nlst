@@ -7,3 +7,5 @@
 **pids.txt**: PIDs separated to train, test, and val splits 
 
 **pyradiomics_features.txt**: list of all pyradiomics features collected
+
+**pospick_selected.csv**: tight bounding boxes of first scan cancer nodules
